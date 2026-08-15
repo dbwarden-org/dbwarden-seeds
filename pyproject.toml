@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "dbwarden-seeds"
 version = "0.1.0"
-description = "Seed data management for DBWarden"
+description = "Seed data management for dbwarden"
 readme = "README.md"
 requires-python = ">=3.12.7"
 dependencies = ["dbwarden>=0.16.0"]
