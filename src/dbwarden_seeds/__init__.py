@@ -24,7 +24,7 @@ from dbwarden_seeds.engine import (
 )
 from dbwarden_seeds.export import export_seeds_cmd
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 # The dbwarden plugin contract this package targets. Core refuses to load a
 # plugin declaring a version it does not provide, so a mismatched pairing fails

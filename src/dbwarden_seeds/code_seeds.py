@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -38,13 +39,14 @@ def _get_code_seed_filename(cls: type[Seed]) -> str:
 
 
 def _get_code_seed_version(cls: type[Seed], db_name: str | None = None) -> str:
-    seeds = discover_code_seeds(db_name)
-    seeds.sort(key=lambda c: f"{c.__module__}.{c.__qualname__}")
-    try:
-        idx = seeds.index(cls)
-    except ValueError:
-        idx = 0
-    return f"C{idx + 1:04d}"
+    """Return the code seed's explicit, immutable tracking version."""
+    version = getattr(cls, "__seed_version__", "")
+    if not isinstance(version, str) or not re.fullmatch(r"C\d{4,}", version):
+        raise SeedError(
+            f"Code seed {cls.__module__}.{cls.__qualname__} must declare "
+            "__seed_version__ in the form 'C0001'."
+        )
+    return version
 
 
 def _compute_code_seed_checksum(cls: type[Seed]) -> str:

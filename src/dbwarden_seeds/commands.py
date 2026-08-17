@@ -97,6 +97,7 @@ def _apply_seeds_single(
 
     from dbwarden.repositories.seeds_repo import (
         create_seeds_table_if_not_exists,
+        get_applied_seed_versions,
         get_seeds_directory,
     )
 
@@ -109,6 +110,9 @@ def _apply_seeds_single(
         if version not in all_seeds:
             error(f"Seed V{version} not found in seeds directory.")
             raise SystemExit(1)
+        if version in get_applied_seed_versions(db_name):
+            info(f"Seed V{version} is already applied.")
+            return
         apply_single_seed(
             version=version,
             filepath=all_seeds[version][0],

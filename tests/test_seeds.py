@@ -2,7 +2,11 @@ import os
 import tempfile
 from pathlib import Path
 
+import pytest
+
 from dbwarden.constants import SEEDS_DIR
+from dbwarden.exceptions import SeedError
+from dbwarden_seeds.code_seeds import _get_code_seed_version
 from dbwarden_seeds.engine import (
     SEED_SQL_PATTERN,
     SEED_PYTHON_PATTERN,
@@ -114,6 +118,30 @@ def test_get_seed_filepaths_by_version_ignores_non_seed():
         seeds = _get_seed_filepaths_by_version(tmpdir)
         assert "0001" in seeds
         assert len(seeds) == 1
+
+
+def test_get_seed_filepaths_by_version_rejects_duplicate_versions():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        _write_seed(tmpdir, "V0001__first.sql", "")
+        _write_seed(tmpdir, "V0001__second.py", "")
+
+        with pytest.raises(SeedError, match="Duplicate seed version V0001"):
+            _get_seed_filepaths_by_version(tmpdir)
+
+
+def test_code_seed_version_is_explicit_and_stable():
+    class ExampleSeed:
+        __seed_version__ = "C0001"
+
+    assert _get_code_seed_version(ExampleSeed) == "C0001"
+
+
+def test_code_seed_version_requires_explicit_version():
+    class ExampleSeed:
+        pass
+
+    with pytest.raises(SeedError, match="__seed_version__"):
+        _get_code_seed_version(ExampleSeed)
 
 
 def test_description_from_filename():
@@ -264,6 +292,30 @@ def test_seed_create_creates_directory_and_file():
             assert len(files) == 1
             assert files[0].name.endswith(".sql")
             assert "my_seed" in files[0].name
+        finally:
+            os.chdir(old_cwd)
+
+
+def test_seed_apply_version_skips_already_applied_seed(monkeypatch):
+    with tempfile.TemporaryDirectory() as tmpdir:
+        old_cwd = os.getcwd()
+        os.chdir(tmpdir)
+        try:
+            _reset_dev_mode()
+            _setup_dbwarden_config(tmpdir, "test_explicit.db")
+            seeds_dir = Path(tmpdir, SEEDS_DIR)
+            seeds_dir.mkdir()
+            _write_seed(str(seeds_dir), "V0001__first.sql", "SELECT 1;")
+            create_seeds_table_if_not_exists(db_name=None)
+            record_applied_seed("0001", "first", "V0001__first.sql", "sql", "c1", db_name=None)
+
+            monkeypatch.setattr(
+                "dbwarden_seeds.commands.apply_single_seed",
+                lambda **_: pytest.fail("an applied seed must not be re-run"),
+            )
+            from dbwarden_seeds.commands import _apply_seeds_single
+
+            _apply_seeds_single(version="0001")
         finally:
             os.chdir(old_cwd)
 

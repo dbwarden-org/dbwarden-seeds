@@ -20,6 +20,8 @@ Backs the `dbwarden seed` command group. Without this plugin those commands tell
 
 `seed_apply` also runs after `dbwarden migrate --apply-seeds`, and covers both file seeds (`seeds/V0001__*.sql`) and code seeds (`Seed` subclasses discovered from your models).
 
+Code seeds must declare a permanent version such as `__seed_version__ = "C0001"`. Never change or reuse a released code-seed version; add a new class with the next version instead.
+
 ## Installation
 
 ```bash

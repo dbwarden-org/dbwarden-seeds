@@ -12,6 +12,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session as SASession
 
 from dbwarden.engine.checksum import calculate_checksum
+from dbwarden.exceptions import SeedError
 from dbwarden.logging import get_logger
 from dbwarden.output import info, warning
 from dbwarden.repositories.seeds_repo import (
@@ -89,12 +90,22 @@ def _get_seed_filepaths_by_version(seeds_dir: str) -> dict[str, tuple[str, str]]
         if match:
             version = match.group(1)
             filepath = os.path.join(seeds_dir, filename)
+            if version in seeds:
+                raise SeedError(
+                    f"Duplicate seed version V{version}: "
+                    f"{Path(seeds[version][0]).name} and {filename}"
+                )
             seeds[version] = (filepath, "sql")
             continue
         match = SEED_PYTHON_PATTERN.match(filename)
         if match:
             version = match.group(1)
             filepath = os.path.join(seeds_dir, filename)
+            if version in seeds:
+                raise SeedError(
+                    f"Duplicate seed version V{version}: "
+                    f"{Path(seeds[version][0]).name} and {filename}"
+                )
             seeds[version] = (filepath, "python")
     return seeds
 
