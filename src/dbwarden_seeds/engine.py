@@ -267,7 +267,7 @@ def apply_single_seed(
         warning(f"Would apply seed V{version}: {filename}")
         return
 
-    from dbwarden.database.connection import get_db_connection
+    from dbwarden.connection import get_db_connection
 
     with get_db_connection(db_name) as connection:
         if seed_type == "sql":

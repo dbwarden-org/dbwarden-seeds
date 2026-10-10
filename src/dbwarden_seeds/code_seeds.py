@@ -113,7 +113,7 @@ def apply_code_seed(
         warning(f"Would apply code seed {version}: {description}")
         return
 
-    from dbwarden.database.connection import get_db_connection
+    from dbwarden.connection import get_db_connection
 
     if not hasattr(cls, "model"):
         raise SeedError(f"Seed class {cls.__name__} must have a 'model' attribute")

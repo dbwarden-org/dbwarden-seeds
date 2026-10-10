@@ -333,7 +333,7 @@ def test_seeds_table_configurable():
                 f"database_config(database_name='primary', default=True, database_type='sqlite', database_url_sync='{db_path}', seed_table='custom_seeds')\n",
                 encoding="utf-8",
             )
-            from dbwarden.database.queries import get_seed_table_name
+            from dbwarden.connection.queries import get_seed_table_name
 
             table_name = get_seed_table_name(db_name=None)
             assert table_name == "custom_seeds"
@@ -346,5 +346,76 @@ def test_seeds_table_configurable():
             records = get_all_seed_records(db_name=None)
             assert len(records) == 1
             assert records[0].version == "0001"
+        finally:
+            os.chdir(old_cwd)
+
+
+def test_apply_single_seed_executes_sql_and_records():
+    """Real engine path: apply an SQL seed file against a live sqlite database."""
+    from dbwarden.connection import get_db_connection
+    from sqlalchemy import text
+
+    from dbwarden_seeds.engine import apply_single_seed
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        old_cwd = os.getcwd()
+        os.chdir(tmpdir)
+        try:
+            _reset_dev_mode()
+            _setup_dbwarden_config(tmpdir, "test_apply.db")
+            create_seeds_table_if_not_exists(db_name=None)
+            path = os.path.join(tmpdir, "V0001__users.sql")
+            _write_seed(
+                tmpdir,
+                "V0001__users.sql",
+                "CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT);\n"
+                "INSERT INTO users (id, name) VALUES (1, 'alice');\n",
+            )
+            apply_single_seed("0001", path, "sql", db_name=None)
+            assert seed_is_applied("0001", db_name=None)
+            with get_db_connection(None) as conn:
+                rows = conn.execute(text("SELECT name FROM users WHERE id = 1")).fetchall()
+            assert rows[0][0] == "alice"
+        finally:
+            os.chdir(old_cwd)
+
+
+def test_apply_code_seed_inserts_rows_and_records():
+    """Real code-seed path: apply a Seed subclass with declarative rows."""
+    from dbwarden.connection import get_db_connection
+    from dbwarden.seed import Seed, SeedRow
+    from sqlalchemy import Column, Integer, Text, text
+    from sqlalchemy.orm import declarative_base
+
+    from dbwarden_seeds.code_seeds import apply_code_seed
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        old_cwd = os.getcwd()
+        os.chdir(tmpdir)
+        try:
+            _reset_dev_mode()
+            _setup_dbwarden_config(tmpdir, "test_code_apply.db")
+            create_seeds_table_if_not_exists(db_name=None)
+
+            Base = declarative_base()
+
+            class User(Base):
+                __tablename__ = "users"
+                id = Column(Integer, primary_key=True)
+                name = Column(Text)
+
+            with get_db_connection(None) as conn:
+                Base.metadata.create_all(conn)
+
+            class UsersSeed(Seed):
+                model = User
+                __seed_version__ = "C0001"
+                rows = [SeedRow(id=1, name="alice")]  # noqa: RUF012
+
+            apply_code_seed(UsersSeed, db_name=None)
+            assert seed_is_applied("C0001", db_name=None)
+            with get_db_connection(None) as conn:
+                rows = conn.execute(text("SELECT name FROM users WHERE id = 1")).fetchall()
+            assert rows[0][0] == "alice"
         finally:
             os.chdir(old_cwd)
